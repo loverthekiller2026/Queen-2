@@ -6,7 +6,7 @@ from pyrogram import Client, idle
 from pytgcalls import PyTgCalls
 
 from config import API_ID, API_HASH, BOT_TOKEN, SESSION_NAME
-from health_server import start_health_server
+from health_server import start_health_server, set_ready
 from callsmusic.callsmusic import configure as configure_playback
 import runtime
 
@@ -49,9 +49,11 @@ def main():
         log.info("Starting PyTgCalls 0.8.6")
         pytgcalls.start()
         started_calls = True
+        set_ready(True)
         log.info("Queen-2 is ready")
         idle()
     finally:
+        set_ready(False)
         log.info("Stopping Queen-2")
         if started_calls:
             try:
