@@ -9,12 +9,14 @@ log = logging.getLogger(__name__)
 _server = None
 _ready = False
 
+
 def set_ready(value):
     global _ready
     _ready = bool(value)
 
+
 class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
+    def _respond(self, include_body=True):
         if self.path not in ("/", "/health", "/healthz"):
             self.send_error(404)
             return
@@ -27,10 +29,18 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
-        self.wfile.write(payload)
+        if include_body:
+            self.wfile.write(payload)
+
+    def do_GET(self):
+        self._respond(include_body=True)
+
+    def do_HEAD(self):
+        self._respond(include_body=False)
 
     def log_message(self, fmt, *args):
         log.info("health: " + fmt, *args)
+
 
 def start_health_server():
     global _server
