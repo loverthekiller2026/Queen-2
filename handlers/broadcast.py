@@ -8,7 +8,7 @@ from config import SUDO_USERS
 
 log = logging.getLogger(__name__)
 
-@Client.on_message(filters.command(["broadcastxd", "gcastxd"]))
+@Client.on_message(filters.command(["broadcast", "gcast"]))
 async def broadcast(_, message: Message):
     if not message.from_user or message.from_user.id not in SUDO_USERS:
         return
