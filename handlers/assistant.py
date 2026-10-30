@@ -1,35 +1,38 @@
-import asyncio
-from pyrogram.types import Message
+"""Assistant membership helper."""
+import logging
+
 from pyrogram import Client, filters
-from helpers.filters import command, other_filters
 from pyrogram.errors import UserAlreadyParticipant
+from pyrogram.types import Message
+
+from main import assistant
+from helpers.filters import command
 from helpers.decorators import authorized_users_only
-from callsmusic.callsmusic import client as user
 
+log = logging.getLogger(__name__)
 
-@Client.on_message(
-    command(["join", "assistant", " userbotjoin"]) & ~filters.private & ~filters.bot
-)
+@Client.on_message(command(["join", "assistant"]) & filters.group & ~filters.bot)
 @authorized_users_only
-async def join_chat(c: Client, m: Message):
-    await m.delete()
-    chat_id = m.chat.id
+async def join_chat(client: Client, message: Message):
+    status = await message.reply_text("Checking assistant membership…")
     try:
-        invite_link = await m.chat.export_invite_link()
-        if "+" in invite_link:
-            link_hash = (invite_link.replace("+", "")).split("t.me/")[1]
-            await user.join_chat(f"https://t.me/joinchat/{link_hash}")
-        await m.chat.promote_member(
-            (await user.get_me()).id,
-            can_manage_voice_chats=True
-        )
-        return await user.send_message(chat_id, "Assistant successfully joined the chat.​")
-    except UserAlreadyParticipant:
-        admin = await m.chat.get_member((await user.get_me()).id)
-        if not admin.can_manage_voice_chats:
-            await m.chat.promote_member(
-                (await user.get_me()).id,
-                can_manage_voice_chats=True
-            )
-            return await user.send_message(chat_id, "Assistant already joined the chat.​")
-        return await user.send_message(chat_id, "Assistant already joined the chat lodu.​")
+        await assistant.get_chat(message.chat.id)
+        member = await client.get_chat_member(message.chat.id, (await assistant.get_me()).id)
+        if member.status == "administrator" and member.can_manage_voice_chats:
+            await status.edit_text("Assistant is already in the group with voice-chat permission.")
+            return
+        await status.edit_text("Assistant is already a member. Please grant it permission to manage voice chats.")
+        return
+    except Exception:
+        pass
+
+    try:
+        invite = await client.export_chat_invite_link(message.chat.id)
+        try:
+            await assistant.join_chat(invite)
+        except UserAlreadyParticipant:
+            pass
+        await status.edit_text("Assistant joined. Promote it and enable Manage Video Chats before using /play.")
+    except Exception as exc:
+        log.exception("Assistant join failed")
+        await status.edit_text(f"Could not add assistant: {type(exc).__name__}: {exc}")
