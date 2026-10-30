@@ -1,5 +1,5 @@
 # Queen-2 runtime dependencies
-Pyrogram==1.4.16
+Pyrogram==2.0.106
 TgCrypto==1.2.5
 py-tgcalls==0.8.6
 python-dotenv==1.0.1
