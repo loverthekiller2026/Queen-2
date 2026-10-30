@@ -1,29 +1,29 @@
-from os import path
+"""Convert audio into the PCM format expected by the legacy PyTgCalls API."""
 import asyncio
+import os
+import re
+import hashlib
 
 from helpers.errors import FFmpegReturnCodeError
 
-
 async def convert(file_path: str) -> str:
-    out = path.basename(file_path)
-    out = out.split(".")
-    out[-1] = "raw"
-    out = ".".join(out)
-    out = path.basename(out)
-    out = path.join("raw_files", out)
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(file_path)
+    os.makedirs("raw_files", exist_ok=True)
+    stem = hashlib.sha256(os.path.abspath(file_path).encode()).hexdigest()[:20]
+    output = os.path.join("raw_files", f"{stem}.raw")
+    if os.path.isfile(output) and os.path.getsize(output) > 0:
+        return output
 
-    if path.isfile(out):
-        return out
-
-    proc = await asyncio.create_subprocess_shell(
-        f"ffmpeg -y -i {file_path} -f s16le -ac 1 -ar 48000 -acodec pcm_s16le {out}",
-        asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+    process = await asyncio.create_subprocess_exec(
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-i", file_path, "-vn", "-f", "s16le", "-ac", "2",
+        "-ar", "48000", "-acodec", "pcm_s16le", output,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
     )
-
-    await proc.communicate()
-
-    if proc.returncode != 0:
-        raise FFmpegReturnCodeError("FFmpeg did not return 0")
-
-    return out
+    _, stderr = await process.communicate()
+    if process.returncode != 0 or not os.path.isfile(output) or os.path.getsize(output) == 0:
+        detail = stderr.decode("utf-8", "replace")[-1500:] if stderr else "unknown FFmpeg error"
+        raise FFmpegReturnCodeError(detail)
+    return output
