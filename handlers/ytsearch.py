@@ -1,40 +1,33 @@
-# the logging things
-import logging
-
+"""YouTube search command."""
+import asyncio
+from pyrogram import Client, filters
 from pyrogram.types import Message
-from search_engine_parser import GoogleSearch
 from youtube_search import YoutubeSearch
 
-from pyrogram import Client as app, filters
-
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
-
-import pyrogram
-
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
-
-@app.on_message(pyrogram.filters.command(["search"]))
+@Client.on_message(filters.command(["search"]))
 async def ytsearch(_, message: Message):
-    await message.delete()
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2:
+        await message.reply_text("Give a song or artist name to search.")
+        return
+    status = await message.reply_text("Searching…")
     try:
-        if len(message.command) < 2:
-            await message.reply_text(" Give some text to search!")
+        results = await asyncio.to_thread(
+            lambda: YoutubeSearch(parts[1], max_results=5).to_dict()
+        )
+        if not results:
+            await status.edit_text("No results found.")
             return
-        query = message.text.split(None, 1)[1]
-        m = await message.reply_text("🔎")
-        results = YoutubeSearch(query, max_results=4).to_dict()
-        i = 0
-        text = ""
-        while i < 4:
-            text += f"📌 Title : {results[i]['title']}\n"
-            text += f"⏱ duration : {results[i]['duration']}\n"
-            text += f"👀 views : {results[i]['views']}\n"
-            text += f"📣 channel : {results[i]['channel']}\n"
-            text += f"🔗 link : https://youtube.com{results[i]['url_suffix']}\n\n"
-            i += 1
-        await m.edit(text, disable_web_page_preview=True)
-    except Exception as e:
-        await message.reply_text(str(e))
+        lines = []
+        for item in results:
+            lines.append(
+                "Title: {title}\nDuration: {duration}\nChannel: {channel}\nLink: https://youtube.com{url}\n".format(
+                    title=item.get("title", "Unknown"),
+                    duration=item.get("duration", "Unknown"),
+                    channel=item.get("channel", "Unknown"),
+                    url=item.get("url_suffix", ""),
+                )
+            )
+        await status.edit_text("\n".join(lines), disable_web_page_preview=True)
+    except Exception as exc:
+        await status.edit_text("Search failed: {}: {}".format(type(exc).__name__, exc))
