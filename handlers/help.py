@@ -6,7 +6,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, 
 
 
 
-@Client.on_message(command("help") & filters.private & ~filters.group & ~filters.edited)
+@Client.on_message(command("help") & filters.private & ~filters.group & not_edited)
 async def help_cmd(client: Client, message: Message):
     await message.reply_sticker("CAACAgUAAx0CZ80CewABAn7iY0QmDt7nsecHlSDH7oMXmtavNH4AAhMHAALnnCFW1zONdkHrocAeBA")
     await message.reply_photo(f"{START_IMG}", caption=f"""
