@@ -1,43 +1,43 @@
-from typing import Dict
-from asyncio import Queue, QueueEmpty as Empty
+"""Small per-chat FIFO queues for local audio files."""
+from asyncio import Queue, QueueEmpty
+from typing import Dict, Optional
 
-
-queues: Dict[int, Queue] = {}
-
+_queues: Dict[int, Queue] = {}
 
 async def put(chat_id: int, **kwargs) -> int:
-    if chat_id not in queues:
-        queues[chat_id] = Queue()
-    await queues[chat_id].put({**kwargs})
-    return queues[chat_id].qsize()
+    queue = _queues.setdefault(int(chat_id), Queue())
+    await queue.put(dict(kwargs))
+    return queue.qsize()
 
-
-def get(chat_id: int) -> Dict[str, str]:
-    if chat_id in queues:
-        try:
-            return queues[chat_id].get_nowait()
-        except Empty:
-            return None
-
+def get(chat_id: int) -> Optional[dict]:
+    queue = _queues.get(int(chat_id))
+    if queue is None:
+        return None
+    try:
+        item = queue.get_nowait()
+        queue.task_done()
+        return item
+    except QueueEmpty:
+        return None
 
 def is_empty(chat_id: int) -> bool:
-    if chat_id in queues:
-        return queues[chat_id].empty()
-    return True
-
+    queue = _queues.get(int(chat_id))
+    return queue is None or queue.empty()
 
 def task_done(chat_id: int):
-    if chat_id in queues:
-        try:
-            queues[chat_id].task_done()
-        except ValueError:
-            pass
-
+    # Kept for compatibility with older handlers; queue.get() accounts for tasks.
+    return None
 
 def clear(chat_id: int):
-    if chat_id in queues:
-        if queues[chat_id].empty():
-            raise Empty
-        else:
-            queues[chat_id].queue = []
-    raise Empty
+    queue = _queues.get(int(chat_id))
+    if queue is not None:
+        while not queue.empty():
+            try:
+                queue.get_nowait()
+                queue.task_done()
+            except QueueEmpty:
+                break
+
+def reset(chat_id: int):
+    clear(chat_id)
+    _queues.pop(int(chat_id), None)
