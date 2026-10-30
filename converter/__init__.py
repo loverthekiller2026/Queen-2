@@ -1,5 +1,4 @@
-from os import listdir, mkdir
+import os
 
-if "raw_files" not in listdir(): mkdir("raw_files")
-
+os.makedirs("raw_files", exist_ok=True)
 from .converter import convert
