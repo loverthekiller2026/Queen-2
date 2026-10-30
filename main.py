@@ -24,17 +24,18 @@ bot = Client(
     plugins={"root": "handlers"},
     workers=8,
 )
-# Pyrogram 1.4.16 accepts the serialized session string as its first
-# positional session_name argument. The separate session_string keyword
-# was introduced in Pyrogram 2.x, which is not used with PyTgCalls 0.8.6.
+# Pyrogram 2.0.106 supports the session_string keyword and includes
+# the newer MTProto message-id/time synchronization fixes.
 assistant = Client(
-    SESSION_NAME,
+    "queen_assistant",
     api_id=API_ID,
     api_hash=API_HASH,
+    session_string=SESSION_NAME,
     workers=4,
 )
 pytgcalls = configure_playback(PyTgCalls(assistant))
 runtime.configure(bot, assistant, pytgcalls)
+
 
 def main():
     start_health_server()
@@ -72,6 +73,7 @@ def main():
                 bot.stop()
             except Exception:
                 log.exception("Error stopping bot")
+
 
 if __name__ == "__main__":
     try:
