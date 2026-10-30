@@ -8,7 +8,7 @@ from helpers.decorators import sudo_users_only, errors
 downloads = os.path.realpath("downloads")
 raw_files = os.path.realpath("raw_files")
 
-@Client.on_message(command(["erase", "rmd"]) & ~filters.edited)
+@Client.on_message(command(["erase", "rmd"]) & not_edited)
 @errors
 @sudo_users_only
 async def clear_downloads(_, message: Message):
@@ -22,7 +22,7 @@ async def clear_downloads(_, message: Message):
         await message.reply_text("**no files download on ddatabas**")
 
         
-@Client.on_message(command(["rmw", "clean"]) & ~filters.edited)
+@Client.on_message(command(["rmw", "clean"]) & not_edited)
 @errors
 @sudo_users_only
 async def clear_raw(_, message: Message):
@@ -36,7 +36,7 @@ async def clear_raw(_, message: Message):
         await message.reply_text("**no raw files​**")
 
 
-@Client.on_message(command(["clear", " rmp"]) & ~filters.edited)
+@Client.on_message(command(["clear", " rmp"]) & not_edited)
 @errors
 @sudo_users_only
 async def cleanup(_, message: Message):
