@@ -6,7 +6,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 
-@Client.on_message(command("start") & filters.private & ~filters.group & ~filters.edited)
+@Client.on_message(command("start") & filters.private & ~filters.group & not_edited)
 async def start_(client: Client, message: Message):
     await message.reply_sticker("CAACAgUAAx0CZ80CewABAn7iY0QmDt7nsecHlSDH7oMXmtavNH4AAhMHAALnnCFW1zONdkHrocAeBA")
     await message.reply_photo(
@@ -35,14 +35,14 @@ async def start_(client: Client, message: Message):
                         "👤 Bot Owner ", url=f"https://t.me/{me}"
                     ),
                     InlineKeyboardButton(
-                        "👨‍💻 Developer ", url=f"https://t.me/D4nGeR_0pBolte"
+                        "👨‍💻 Developer ", url=f"https://t.me/FULL_CRUAL_MIND"
                     ),
                   ],[
                     InlineKeyboardButton(
                         "✅ Inline ", switch_inline_query_current_chat=""
                     ),
                     InlineKeyboardButton(
-                        "💡 Git repo", url="https://t.me/helping_support"
+                        "💡 Git repo", url="https://t.me/sector_bot_support"
                     )]
             ]
        ),
