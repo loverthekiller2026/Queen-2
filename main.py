@@ -24,11 +24,13 @@ bot = Client(
     plugins={"root": "handlers"},
     workers=8,
 )
+# Pyrogram 1.4.16 accepts the serialized session string as its first
+# positional session_name argument. The separate session_string keyword
+# was introduced in Pyrogram 2.x, which is not used with PyTgCalls 0.8.6.
 assistant = Client(
-    "queen_assistant",
+    SESSION_NAME,
     api_id=API_ID,
     api_hash=API_HASH,
-    session_string=SESSION_NAME,
     workers=4,
 )
 pytgcalls = configure_playback(PyTgCalls(assistant))
