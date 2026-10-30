@@ -1,4 +1,4 @@
-"""Minimal HTTP health endpoint required by Render Web Services."""
+"""Readiness endpoint required by Render Web Services."""
 import json
 import logging
 import os
@@ -7,14 +7,23 @@ from threading import Thread
 
 log = logging.getLogger(__name__)
 _server = None
+_ready = False
+
+def set_ready(value):
+    global _ready
+    _ready = bool(value)
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path not in ("/", "/health", "/healthz"):
             self.send_error(404)
             return
-        payload = json.dumps({"status": "ok", "service": "queen-2"}).encode()
-        self.send_response(200)
+        code = 200 if _ready else 503
+        payload = json.dumps({
+            "status": "ready" if _ready else "starting",
+            "service": "queen-2",
+        }).encode()
+        self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
