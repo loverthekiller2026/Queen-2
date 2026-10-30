@@ -24,7 +24,7 @@ async def reply_output(message, text):
     else:
         await message.reply_text(text)
 
-@Client.on_message(command(["eval", "eval@{}".format(BOT_USERNAME)]) & ~filters.edited)
+@Client.on_message(command(["eval", "eval@{}".format(BOT_USERNAME)]) & not_edited)
 @sudo_users_only
 async def executor(client, message: Message):
     if len(message.command) < 2:
@@ -45,7 +45,7 @@ async def executor(client, message: Message):
     result = result[:3500]
     await reply_output(message, "Output:\n{}\nElapsed: {:.3f}s".format(result, time() - started))
 
-@Client.on_message(command(["sh", "sh@{}".format(BOT_USERNAME)]) & ~filters.edited)
+@Client.on_message(command(["sh", "sh@{}".format(BOT_USERNAME)]) & not_edited)
 @sudo_users_only
 async def shellrunner(client, message: Message):
     if len(message.command) < 2:
