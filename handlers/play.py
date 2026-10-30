@@ -78,7 +78,7 @@ async def _ensure_assistant_in_chat(client, message):
         raise ValueError("Promote the assistant and enable Manage Video Chats permission.")
 
 
-@Client.on_message(command(["play", "p"]) & filters.group & ~filters.edited & ~filters.forwarded & ~filters.via_bot)
+@Client.on_message(command(["play", "p"]) & filters.group & not_edited & ~filters.forwarded & ~filters.via_bot)
 @errors
 async def play(client: Client, message: Message):
     status = await message.reply_text("Preparing your track…")
