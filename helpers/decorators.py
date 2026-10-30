@@ -1,9 +1,12 @@
 """Reusable command authorization and error wrappers."""
 import logging
 from functools import wraps
+
 from config import SUDO_USERS
 from helpers.admins import get_administrators
+
 log = logging.getLogger(__name__)
+
 def errors(func):
     @wraps(func)
     async def wrapper(client, message, *args, **kwargs):
@@ -16,6 +19,7 @@ def errors(func):
             except Exception:
                 pass
     return wrapper
+
 def authorized_users_only(func):
     @wraps(func)
     async def wrapper(client, message, *args, **kwargs):
@@ -26,11 +30,12 @@ def authorized_users_only(func):
             return await func(client, message, *args, **kwargs)
         if message.chat.type == "private":
             return
-        admins = await get_administrators(message.chat)
+        admins = await get_administrators(client, message.chat)
         if user.id in admins:
             return await func(client, message, *args, **kwargs)
         return await message.reply_text("Only group administrators can use this command.")
     return wrapper
+
 def sudo_users_only(func):
     @wraps(func)
     async def wrapper(client, message, *args, **kwargs):
