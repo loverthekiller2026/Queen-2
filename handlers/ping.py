@@ -19,7 +19,7 @@ def readable_time(seconds):
     parts.append("{}s".format(seconds))
     return " ".join(parts)
 
-@Client.on_message(command(["ping", "alive"]) & filters.group & ~filters.edited)
+@Client.on_message(command(["ping", "alive"]) & filters.group & not_edited)
 async def ping(_, message: Message):
     started = time.perf_counter()
     sent = await message.reply_text("Checking…")
