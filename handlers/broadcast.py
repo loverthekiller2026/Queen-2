@@ -1,31 +1,36 @@
+"""Sudo-only broadcast to chats visible to the bot account."""
 import asyncio
-
+import logging
+import runtime
 from pyrogram import Client, filters
-from pyrogram.types import Dialog, Chat, Message
-from pyrogram.errors import UserAlreadyParticipant
-
-from callsmusic.callsmusic import client as GJ516
+from pyrogram.types import Message
 from config import SUDO_USERS
+
+log = logging.getLogger(__name__)
 
 @Client.on_message(filters.command(["broadcastxd", "gcastxd"]))
 async def broadcast(_, message: Message):
-    await message.delete()
-    sent=0
-    failed=0
-    if message.from_user.id not in SUDO_USERS:
+    if not message.from_user or message.from_user.id not in SUDO_USERS:
         return
-    else:
-        wtf = await message.reply("`starting broardcast...`")
-        if not message.reply_to_message:
-            await wtf.edit("**__reply to a message to broadcast__**")
-            return
-        lmao = message.reply_to_message.text
-        async for dialog in GJ516.iter_dialogs():
-            try:
-                await GJ516.send_message(dialog.chat.id, lmao)
-                sent = sent+1
-                await wtf.edit(f"`Broadcasted...` \n\n**broadcasted to  :** `{sent}` **chats** \n**faild in :** `{failed}` **chats**")
-                await asyncio.sleep(0.3)
-            except:
-                failed=failed+1
-        await message.reply_text(f"**Broadcasted successfully ** \n\n**broadcasted to :** `{sent}` **chats** \n**failed in​ :** `{failed}` **chats**")
+    if not message.reply_to_message:
+        await message.reply_text("Reply to a text message to broadcast it.")
+        return
+    text = message.reply_to_message.text or message.reply_to_message.caption
+    if not text:
+        await message.reply_text("Only text messages are supported by this broadcast command.")
+        return
+    status = await message.reply_text("Broadcast started.")
+    sent = failed = 0
+    async for dialog in runtime.bot.get_dialogs():
+        if dialog.chat.type not in ("group", "supergroup", "private", "channel"):
+            continue
+        try:
+            await runtime.bot.send_message(dialog.chat.id, text)
+            sent += 1
+        except Exception as exc:
+            failed += 1
+            log.debug("Broadcast failed for %s: %s", dialog.chat.id, exc)
+        if (sent + failed) % 10 == 0:
+            await status.edit_text("Broadcasting…\nSent: {}\nFailed: {}".format(sent, failed))
+        await asyncio.sleep(0.2)
+    await status.edit_text("Broadcast finished.\nSent: {}\nFailed: {}".format(sent, failed))

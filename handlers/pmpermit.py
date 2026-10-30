@@ -1,83 +1,54 @@
-import asyncio
-from pyrogram import Client
-from helpers.filters import command
-from config import SUDO_USERS, BOT_NAME as bn, BOT_USERNAME as lel, PMPERMIT, OWNER_USERNAME
-from pyrogram import filters
+"""Optional private-message guard for the assistant account."""
+import runtime
+from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from callsmusic import client as USER
 
-PMSET =True
-pchats = []
+from config import BOT_NAME, BOT_USERNAME, PMPERMIT, OWNER_USERNAME, SUPPORT_GROUP, SUDO_USERS
 
-@USER.on_message(filters.text & filters.private & ~filters.me & ~filters.bot)
-async def pmPermit(client: USER, message: Message):
-    if PMPERMIT == "ENABLE":
-        if PMSET:
-            chat_id = message.chat.id
-            if chat_id in pchats:
-                return
-            await USER.send_message(
-                message.chat.id,
-                f"hey {message.from_user.mention()},\nThis is [{bn}](t.me/{lel}) bot assistant account.\n\ndon't try to spam here eles you will get fu*ked by [Danger Choudhary 😇](t.me/{OWNER_USERNAME}).\n",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "🤖 Bot", url=f"https://t.me/{lel}"
-                    ),
-                    InlineKeyboardButton(
-                        "📨 Support", url=f"https://t.me/{SUPPORT_GROUP}"
-                    )
-                ],[ 
-                    InlineKeyboardButton(
-                        "👤 Bot owner", url=f"https://t.me/{OWNER_USERNAME}"
-                    )]
-            ]
-        ),
+PMSET = True
+approved_chats = set()
 
+@runtime.assistant.on_message(filters.text & filters.private & ~filters.me & ~filters.bot)
+async def pm_permit(_, message: Message):
+    if PMPERMIT != "ENABLE" or not PMSET:
+        return
+    chat_id = message.chat.id
+    if chat_id in approved_chats:
+        return
+    buttons = [[InlineKeyboardButton("Bot", url="https://t.me/{}".format(BOT_USERNAME))]]
+    if SUPPORT_GROUP:
+        buttons[0].append(InlineKeyboardButton("Support", url="https://t.me/{}".format(SUPPORT_GROUP)))
+    if OWNER_USERNAME:
+        buttons.append([InlineKeyboardButton("Owner", url="https://t.me/{}".format(OWNER_USERNAME))])
+    await message.reply_text(
+        "This is the assistant account for {}. Please contact the bot or support group instead of messaging the assistant.".format(BOT_NAME),
+        reply_markup=InlineKeyboardMarkup(buttons),
     )
-            return
-
 
 @Client.on_message(filters.command(["pm", "pmpermit"]))
-async def bye(client: Client, message: Message):
-    if message.from_user.id in SUDO_USERS:
-        global PMSET
-        text = message.text.split(" ", 1)
-        queryy = text[1]
-        if queryy == "on":
-            PMSET = True
-            await message.reply_text("Pm permit enable.")
-            return
-        if queryy == "off":
-            PMSET = None
-            await message.reply_text(" permit disable.")
-            return
+async def toggle_pm_permit(_, message: Message):
+    global PMSET
+    if not message.from_user or message.from_user.id not in SUDO_USERS:
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) != 2 or parts[1].lower() not in ("on", "off"):
+        await message.reply_text("Usage: /pm on or /pm off")
+        return
+    PMSET = parts[1].lower() == "on"
+    await message.reply_text("Assistant PM permit {}.".format("enabled" if PMSET else "disabled"))
 
-@USER.on_message(filters.text & filters.private & filters.me)        
-async def autopmPermiat(client: USER, message: Message):
-    chat_id = message.chat.id
-    if not chat_id in pchats:
-        pchats.append(chat_id)
-        await message.reply_text("Auto approve to pm.")
-        return
-    message.continue_propagation()    
-    
-@USER.on_message(filters.command("a", ["!", ".", ""]) & filters.me & filters.private)
-async def pmPermiat(client: USER, message: Message):
-    chat_id = message.chat.id
-    if not chat_id in pchats:
-        pchats.append(chat_id)
-        await message.reply_text("Approve​ to pm.")
-        return
-    message.continue_propagation()    
-    
+@runtime.assistant.on_message(filters.text & filters.private & filters.me)
+async def auto_approve(_, message: Message):
+    if message.chat.id not in approved_chats:
+        approved_chats.add(message.chat.id)
+        await message.reply_text("This chat is approved for assistant messages.")
 
-@USER.on_message(filters.command("da", ["!", ".", ""]) & filters.me & filters.private)
-async def rmpmPermiat(client: USER, message: Message):
-    chat_id = message.chat.id
-    if chat_id in pchats:
-        pchats.remove(chat_id)
-        await message.reply_text("Disapprove to pm.")
-        return
-    message.continue_propagation()
+@runtime.assistant.on_message(filters.command("a", ["!", ".", ""]) & filters.me & filters.private)
+async def approve_chat(_, message: Message):
+    approved_chats.add(message.chat.id)
+    await message.reply_text("Private chat approved.")
+
+@runtime.assistant.on_message(filters.command("da", ["!", ".", ""]) & filters.me & filters.private)
+async def disapprove_chat(_, message: Message):
+    approved_chats.discard(message.chat.id)
+    await message.reply_text("Private chat approval removed.")

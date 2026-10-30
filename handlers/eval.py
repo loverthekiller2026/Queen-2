@@ -1,168 +1,64 @@
+"""Owner-only Python evaluation and shell helper."""
+import asyncio
 import os
-import re
 import sys
-import shutil
 import traceback
-import subprocess
 from io import StringIO
 from time import time
-from pyrogram import filters
-from inspect import getfullargspec
-from sys import version as pyver
+
+from pyrogram import Client, filters
+from pyrogram.types import Message
 from config import BOT_USERNAME
-from pyrogram import Client
 from helpers.decorators import sudo_users_only
 from helpers.filters import command
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
-
 
 async def aexec(code, client, message):
-    exec(
-        "async def __aexec(client, message): "
-        + "".join(f"\n {a}" for a in code.split("\n"))
-    )
-    return await locals()["__aexec"](client, message)
+    scope = {}
+    source = "async def __aexec(client, message):\n" + "".join("    " + line + "\n" for line in code.splitlines())
+    exec(source, scope)
+    return await scope["__aexec"](client, message)
 
+async def reply_output(message, text):
+    if message.from_user and message.from_user.is_self:
+        await message.edit_text(text)
+    else:
+        await message.reply_text(text)
 
-async def edit_or_reply(msg: Message, **kwargs):
-    func = msg.edit_text if msg.from_user.is_self else msg.reply
-    spec = getfullargspec(func.__wrapped__).args
-    await func(**{k: v for k, v in kwargs.items() if k in spec})
-
-
-@Client.on_message(command(["eval", f"eval@{BOT_USERNAME}"]) & ~filters.edited)
+@Client.on_message(command(["eval", "eval@{}".format(BOT_USERNAME)]) & ~filters.edited)
 @sudo_users_only
-async def executor(client, message):
+async def executor(client, message: Message):
     if len(message.command) < 2:
-        return await edit_or_reply(message, text="__give some text so I will try to execute it.__")
+        return await reply_output(message, "Provide Python code to execute.")
+    code = message.text.split(" ", 1)[1]
+    started = time()
+    old_out, old_err = sys.stdout, sys.stderr
+    out, err = StringIO(), StringIO()
+    sys.stdout, sys.stderr = out, err
+    error = None
     try:
-        cmd = message.text.split(" ", maxsplit=1)[1]
-    except IndexError:
-        return await message.delete()
-    t1 = time()
-    old_stderr = sys.stderr
-    old_stdout = sys.stdout
-    redirected_output = sys.stdout = StringIO()
-    redirected_error = sys.stderr = StringIO()
-    stdout, stderr, exc = None, None, None
-    try:
-        await aexec(cmd, client, message)
+        await aexec(code, client, message)
     except Exception:
-        exc = traceback.format_exc()
-    stdout = redirected_output.getvalue()
-    stderr = redirected_error.getvalue()
-    sys.stdout = old_stdout
-    sys.stderr = old_stderr
-    evaluation = ""
-    if exc:
-        evaluation = exc
-    elif stderr:
-        evaluation = stderr
-    elif stdout:
-        evaluation = stdout
-    else:
-        evaluation = "Success"
-    final_output = f"**output**:\n\n```{evaluation.strip()}```"
-    if len(final_output) > 4096:
-        filename = "output.txt"
-        with open(filename, "w+", encoding="utf8") as out_file:
-            out_file.write(str(evaluation.strip()))
-        t2 = time()
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        text="⏳", callback_data=f"runtime {t2-t1} Seconds"
-                    )
-                ]
-            ]
-        )
-        await message.reply_document(
-            document=filename,
-            caption=f"**input:**\n`{cmd[0:980]}`\n\n**output:**\n`attached document`",
-            quote=False,
-            reply_markup=keyboard,
-        )
-        await message.delete()
-        os.remove(filename)
-    else:
-        t2 = time()
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        text="⏳",
-                        callback_data=f"runtime {round(t2-t1, 3)} Seconds",
-                    )
-                ]
-            ]
-        )
-        await edit_or_reply(message, text=final_output, reply_markup=keyboard)
+        error = traceback.format_exc()
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
+    result = error or err.getvalue() or out.getvalue() or "Success"
+    result = result[:3500]
+    await reply_output(message, "Output:\n{}\nElapsed: {:.3f}s".format(result, time() - started))
 
-@Client.on_callback_query(filters.regex(r"runtime"))
-async def runtime_func_cq(_, cq):
-    runtime = cq.data.split(None, 1)[1]
-    await cq.answer(runtime, show_alert=True)
-
-
-@Client.on_message(command(["sh", f"sh@{BOT_USERNAME}"]) & ~filters.edited)
+@Client.on_message(command(["sh", "sh@{}".format(BOT_USERNAME)]) & ~filters.edited)
 @sudo_users_only
-async def shellrunner(client, message):
+async def shellrunner(client, message: Message):
     if len(message.command) < 2:
-        return await edit_or_reply(message, text="**usage:**\n\n/sh echo oni-chan")
-    text = message.text.split(None, 1)[1]
-    if "\n" in text:
-        code = text.split("\n")
-        output = ""
-        for x in code:
-            shell = re.split(""" (?=(?:[^'"]|'[^']*'|"[^"]*")*$)""", x)
-            try:
-                process = subprocess.Popen(
-                    shell,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-            except Exception as err:
-                print(err)
-                await edit_or_reply(message, text=f"**Error:**\n```{err}```")
-            output += f"**{code}**\n"
-            output += process.stdout.read()[:-1].decode("utf-8")
-            output += "\n"
-    else:
-        shell = re.split(""" (?=(?:[^'"]|'[^']*'|"[^"]*")*$)""", text)
-        for a in range(len(shell)):
-            shell[a] = shell[a].replace('"', "")
-        try:
-            process = subprocess.Popen(
-                shell,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except Exception as err:
-            print(err)
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            errors = traceback.format_exception(
-                etype=exc_type,
-                value=exc_obj,
-                tb=exc_tb,
-            )
-            return await edit_or_reply(
-                message, text=f"**Error:**\n\n```{''.join(errors)}```"
-            )
-        output = process.stdout.read()[:-1].decode("utf-8")
-    if str(output) == "\n":
-        output = None
-    if output:
-        if len(output) > 4096:
-            with open("output.txt", "w+") as file:
-                file.write(output)
-            await app.send_document(
-                message.chat.id,
-                "output.txt",
-                reply_to_message_id=message.message_id,
-                caption="`output`",
-            )
-            return os.remove("output.txt")
-        await edit_or_reply(message, text=f"**output:**\n\n```{output}```")
-    else:
-        await edit_or_reply(message, text="**ᴏᴜᴛᴩᴜᴛ: **\n`No output`")
+        return await reply_output(message, "Usage: /sh <command>")
+    command_text = message.text.split(None, 1)[1]
+    try:
+        process = await asyncio.create_subprocess_shell(
+            command_text,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        output = (stdout + stderr).decode("utf-8", "replace") or "No output"
+    except Exception as exc:
+        output = "{}: {}".format(type(exc).__name__, exc)
+    await reply_output(message, output[:3500])
