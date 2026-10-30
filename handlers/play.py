@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import runtime
 from pyrogram import Client, filters
+from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import Message
 from pytgcalls.types.input_stream import InputAudioStream, InputStream
 from pytgcalls import StreamType
@@ -21,8 +22,10 @@ from downloaders.youtube import download as download_youtube
 log = logging.getLogger(__name__)
 PLAY_LOCKS = {}
 
+
 def _lock(chat_id):
     return PLAY_LOCKS.setdefault(int(chat_id), asyncio.Lock())
+
 
 def _is_url(value):
     try:
@@ -31,12 +34,14 @@ def _is_url(value):
     except Exception:
         return False
 
+
 async def _find_youtube_url(query):
     from youtube_search import YoutubeSearch
     results = await asyncio.to_thread(lambda: YoutubeSearch(query, max_results=1).to_dict())
     if not results:
         raise ValueError("No matching track was found.")
     return "https://www.youtube.com" + results[0]["url_suffix"], results[0]["title"]
+
 
 async def _prepare_audio(message):
     reply = message.reply_to_message
@@ -60,16 +65,18 @@ async def _prepare_audio(message):
     source = await asyncio.to_thread(download_youtube, url)
     return await convert(source), title
 
+
 async def _ensure_assistant_in_chat(client, message):
     me = await runtime.assistant.get_me()
     try:
         member = await client.get_chat_member(message.chat.id, me.id)
     except Exception as exc:
         raise ValueError("Assistant is not in this group. Add it with /join first.") from exc
-    if member.status in ("left", "kicked"):
+    if member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
         raise ValueError("Assistant is not in this group. Add it with /join first.")
-    if member.status != "administrator" or not getattr(member, "can_manage_voice_chats", False):
+    if member.status != ChatMemberStatus.ADMINISTRATOR or not getattr(member, "can_manage_voice_chats", False):
         raise ValueError("Promote the assistant and enable Manage Video Chats permission.")
+
 
 @Client.on_message(command(["play", "p"]) & filters.group & ~filters.edited & ~filters.forwarded & ~filters.via_bot)
 @errors
