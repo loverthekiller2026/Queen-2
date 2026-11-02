@@ -12,7 +12,7 @@ from pytgcalls.types.input_stream import InputAudioStream, InputStream
 from pytgcalls import StreamType
 
 from config import DURATION_LIMIT
-from helpers.filters import command
+from helpers.filters import command, not_edited
 from helpers.decorators import errors
 from helpers.errors import DurationLimitError
 from callsmusic import queues
