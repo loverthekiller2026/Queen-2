@@ -1,4 +1,4 @@
-"""Owner-only Python evaluation and shell helper."""
+""""Owner-only Python evaluation and shell helper."""
 import asyncio
 import os
 import sys
@@ -10,11 +10,11 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from config import BOT_USERNAME
 from helpers.decorators import sudo_users_only
-from helpers.filters import command
+from helpers.filters import command, not_edited
 
 async def aexec(code, client, message):
     scope = {}
-    source = "async def __aexec(client, message):\n" + "".join("    " + line + "\n" for line in code.splitlines())
+    source = "async def __aexec(client, message):\\n" + "".join("    " + line + "\\n" for line in code.splitlines())
     exec(source, scope)
     return await scope["__aexec"](client, message)
 
@@ -43,7 +43,7 @@ async def executor(client, message: Message):
         sys.stdout, sys.stderr = old_out, old_err
     result = error or err.getvalue() or out.getvalue() or "Success"
     result = result[:3500]
-    await reply_output(message, "Output:\n{}\nElapsed: {:.3f}s".format(result, time() - started))
+    await reply_output(message, "Output:\\n{}\\nElapsed: {:.3f}s".format(result, time() - started))
 
 @Client.on_message(command(["sh", "sh@{}".format(BOT_USERNAME)]) & not_edited)
 @sudo_users_only
