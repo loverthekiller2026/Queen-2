@@ -62,7 +62,7 @@ async def _prepare_audio(message):
         url, title = query, query
     else:
         url, title = await _find_youtube_url(query)
-    source = await asyncio.to_thread(download_youtube, url)
+    source = await download_youtube(url)
     return await convert(source), title
 
 
