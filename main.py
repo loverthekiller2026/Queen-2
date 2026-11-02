@@ -15,6 +15,12 @@ from pytgcalls import PyTgCalls
 from pytgcalls.mtproto.pyrogram_client import PyrogramClient as _PyrogramClient
 
 
+# PyTgCalls 0.8.6 calls Client.send() for raw MTProto requests.
+# Pyrogram 2.0.106 exposes the equivalent operation as Client.invoke().
+# Keep the legacy adapter working without changing the playback API.
+Client.send = Client.invoke
+
+
 async def _pyrogram_get_id_compat(self):
     me = await self._app.get_me()
     return me.id if hasattr(me, "id") else me["id"]
