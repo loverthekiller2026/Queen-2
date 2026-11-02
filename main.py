@@ -2,7 +2,12 @@
 import logging
 import os
 
-from pyrogram import Client, idle
+from pyrogram import Client, idle, utils
+
+# Pyrogram 2.0.106 has a 32-bit channel-ID lower bound. Telegram supergroup
+# IDs can exceed it; accept signed 64-bit channel peer IDs to avoid
+# `ValueError: Peer id invalid` while resolving incoming channel updates.
+utils.MIN_CHANNEL_ID = -(1 << 63)
 from pytgcalls import PyTgCalls
 
 # py-tgcalls 0.8.6 expects Pyrogram's get_me() result to be a dict.
