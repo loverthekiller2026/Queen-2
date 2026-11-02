@@ -67,26 +67,61 @@ async def _prepare_audio(message):
 
 
 async def _ensure_assistant_in_chat(client, message):
-    # Check membership through the assistant's own user session. The bot
-    # session may not have the assistant account in its peer database.
+    # Always inspect membership through the user session that joins the call.
     assistant = runtime.assistant
     me = await assistant.get_me()
     try:
         member = await assistant.get_chat_member(message.chat.id, me.id)
     except Exception as exc:
-        log.warning(
-            "Assistant membership lookup failed for chat %s using assistant session: %s",
+        log.exception(
+            "Assistant membership lookup failed: chat_id=%s assistant_id=%s",
             message.chat.id,
-            exc,
+            me.id,
         )
         raise ValueError(
             "I couldn't verify the assistant's membership in this group. "
-            "Make sure the assistant user account has joined this group, then send /play again."
+            "Check that the assistant user account has joined this exact group."
         ) from exc
-    if member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
-        raise ValueError("Assistant is not in this group. Add it with /join first.")
-    if member.status != ChatMemberStatus.ADMINISTRATOR or not getattr(member, "can_manage_voice_chats", False):
-        raise ValueError("Promote the assistant and enable Manage Video Chats permission.")
+
+    status = member.status
+    # Telegram represents the group creator as OWNER, not ADMINISTRATOR.
+    # Owners have all administrator rights implicitly, so do not reject them
+    # because an individual can_manage_* flag is absent/None.
+    if status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED, ChatMemberStatus.RESTRICTED):
+        raise ValueError("Assistant is not an active member of this group. Add the assistant account first.")
+
+    if status == ChatMemberStatus.OWNER:
+        log.info("Assistant membership verified: chat_id=%s assistant_id=%s status=OWNER", message.chat.id, me.id)
+        return
+
+    if status != ChatMemberStatus.ADMINISTRATOR:
+        log.warning(
+            "Assistant lacks administrator status: chat_id=%s assistant_id=%s status=%s",
+            message.chat.id,
+            me.id,
+            status,
+        )
+        raise ValueError("The assistant account must be an administrator in this group.")
+
+    # Pyrogram versions/API layers may expose the same Telegram right under
+    # either the legacy voice-chat name or the newer video-chat name.
+    can_manage_calls = getattr(member, "can_manage_voice_chats", None)
+    if can_manage_calls is None:
+        can_manage_calls = getattr(member, "can_manage_video_chats", None)
+
+    log.info(
+        "Assistant admin rights: chat_id=%s assistant_id=%s "
+        "can_manage_voice_chats=%r can_manage_video_chats=%r",
+        message.chat.id,
+        me.id,
+        getattr(member, "can_manage_voice_chats", None),
+        getattr(member, "can_manage_video_chats", None),
+    )
+    if can_manage_calls is not True:
+        raise ValueError(
+            "Telegram reports that the assistant admin lacks Manage Video Chats permission. "
+            "Please recheck the permission on this exact group."
+        )
 
 
 @Client.on_message(command(["play", "p"]) & filters.group & not_edited & ~filters.forwarded & ~filters.via_bot)
