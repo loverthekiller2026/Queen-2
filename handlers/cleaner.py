@@ -2,7 +2,7 @@ import os
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from config import BOT_NAME as bn
-from helpers.filters import command, other_filters
+from helpers.filters import command, other_filters, not_edited
 from helpers.decorators import sudo_users_only, errors
 
 downloads = os.path.realpath("downloads")
