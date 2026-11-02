@@ -67,11 +67,22 @@ async def _prepare_audio(message):
 
 
 async def _ensure_assistant_in_chat(client, message):
-    me = await runtime.assistant.get_me()
+    # Check membership through the assistant's own user session. The bot
+    # session may not have the assistant account in its peer database.
+    assistant = runtime.assistant
+    me = await assistant.get_me()
     try:
-        member = await client.get_chat_member(message.chat.id, me.id)
+        member = await assistant.get_chat_member(message.chat.id, me.id)
     except Exception as exc:
-        raise ValueError("Assistant is not in this group. Add it with /join first.") from exc
+        log.warning(
+            "Assistant membership lookup failed for chat %s using assistant session: %s",
+            message.chat.id,
+            exc,
+        )
+        raise ValueError(
+            "I couldn't verify the assistant's membership in this group. "
+            "Make sure the assistant user account has joined this group, then send /play again."
+        ) from exc
     if member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
         raise ValueError("Assistant is not in this group. Add it with /join first.")
     if member.status != ChatMemberStatus.ADMINISTRATOR or not getattr(member, "can_manage_voice_chats", False):
