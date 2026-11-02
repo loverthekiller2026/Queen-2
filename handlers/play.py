@@ -103,19 +103,29 @@ async def _ensure_assistant_in_chat(client, message):
         )
         raise ValueError("The assistant account must be an administrator in this group.")
 
-    # Pyrogram versions/API layers may expose the same Telegram right under
-    # either the legacy voice-chat name or the newer video-chat name.
-    can_manage_calls = getattr(member, "can_manage_voice_chats", None)
+    # Pyrogram exposes administrator rights inside member.privileges.
+    # Older code checked the ChatMember object itself, which returns None.
+    privileges = getattr(member, "privileges", None)
+    can_manage_calls = None
+    if privileges is not None:
+        can_manage_calls = getattr(privileges, "can_manage_video_chats", None)
+        if can_manage_calls is None:
+            can_manage_calls = getattr(privileges, "can_manage_voice_chats", None)
+
+    # Compatibility fallback for wrappers exposing rights on ChatMember.
     if can_manage_calls is None:
         can_manage_calls = getattr(member, "can_manage_video_chats", None)
+    if can_manage_calls is None:
+        can_manage_calls = getattr(member, "can_manage_voice_chats", None)
 
     log.info(
-        "Assistant admin rights: chat_id=%s assistant_id=%s "
-        "can_manage_voice_chats=%r can_manage_video_chats=%r",
+        "Assistant admin rights: chat_id=%s assistant_id=%s status=%s "
+        "privileges=%r can_manage_video_chats=%r",
         message.chat.id,
         me.id,
-        getattr(member, "can_manage_voice_chats", None),
-        getattr(member, "can_manage_video_chats", None),
+        status,
+        privileges,
+        can_manage_calls,
     )
     if can_manage_calls is not True:
         raise ValueError(
