@@ -70,11 +70,8 @@ def main():
     finally:
         set_ready(False)
         log.info("Stopping Queen-2")
-        if started_calls:
-            try:
-                pytgcalls.stop()
-            except Exception:
-                log.exception("Error stopping PyTgCalls")
+        # PyTgCalls 0.8.6 has no public stop() method. Stopping the
+        # underlying Pyrogram assistant session shuts down its Node.js core.
         if started_assistant:
             try:
                 assistant.stop()
