@@ -5,6 +5,18 @@ import os
 from pyrogram import Client, idle
 from pytgcalls import PyTgCalls
 
+# py-tgcalls 0.8.6 expects Pyrogram's get_me() result to be a dict.
+# Pyrogram 2.0.106 returns a User object, so adapt this one bridge method.
+from pytgcalls.mtproto.pyrogram_client import PyrogramClient as _PyrogramClient
+
+
+async def _pyrogram_get_id_compat(self):
+    me = await self._app.get_me()
+    return me.id if hasattr(me, "id") else me["id"]
+
+
+_PyrogramClient.get_id = _pyrogram_get_id_compat
+
 from config import API_ID, API_HASH, BOT_TOKEN, SESSION_NAME
 from health_server import start_health_server, set_ready
 from callsmusic.callsmusic import configure as configure_playback
